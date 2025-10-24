@@ -1,0 +1,414 @@
+---
+alwaysApply: true
+---
+
+# Card Battle Game - Complete Rules Documentation
+
+## Overview
+A strategic 1v1 card battle game where two players compete with pre-constructed decks of 20 cards. Victory is achieved by reducing the opponent's health to 0 or having more health when both players run out of cards. Each deck **must** have a type (Speedy, Hardy, or Angry) that provides permanent stat bonuses, and a targeting strategy (Target Mana, Kill Shot, or Optimize Damage) that determines how cards choose their targets, allowing for deep strategic customization.
+
+---
+
+## Card Types
+
+### Available Cards
+There are 5 distinct card types in the game:
+
+| Card Name | Base HP | Base Attack | Base Speed | Mana Cost |
+|-----------|---------|-------------|------------|-----------|
+| Goblin | 15 | 10 | 20 | 1 |
+| Skeleton | 25 | 25 | 10 | 2 |
+| Archer | 45 | 35 | 25 | 4 |
+| Wizard | 60 | 50 | 15 | 6 |
+| Knight | 120 | 50 | 5 | 10 |
+
+### Card Attributes
+- **HP (Hit Points)**: When HP reaches 0, the card is destroyed.
+- **Attack**: Damage dealt to targets.
+- **Speed**: Determines attack order (higher = attacks first).
+- **Mana Cost**: Amount of mana required to draw and play the card.
+
+### Deck Type Bonuses
+Each deck **must have** ONE of three types that applies a permanent bonus to ALL cards in that deck:
+
+| Deck Type | Bonus | Effect | Color |
+|-----------|-------|--------|-------|
+| **⚡ Speedy** | +20 Speed | Cards attack earlier in the queue | Yellow |
+| **🛡️ Hardy** | +30 HP | Cards survive longer | Blue |
+| **⚔️ Angry** | +20 Attack | Cards deal more damage | Red |
+
+- Deck type is **required** and must be part of the deck definition
+- Deck type **cannot be changed** after deck creation
+- The bonus applies to every card drawn from that deck
+- Boosted stats are highlighted in **gold** on the card
+- Player names display a colored pill badge showing deck type
+
+### Target Strategies
+Each deck **must have** ONE of three targeting strategies that determines how cards choose their targets:
+
+| Strategy | Behavior | Best For | Color |
+|----------|----------|----------|-------|
+| **🎯 Target Mana** | Always attacks the highest mana cost card | Eliminating valuable threats | Purple |
+| **💀 Kill Shot** | Prioritizes killable targets, then strongest cards | Efficient board control | Red |
+| **📊 Optimize Damage** | Minimizes wasted damage (targets closest to attack value) | Maximizing damage efficiency | Green |
+
+- Target strategy is **required** and must be part of the deck definition
+- Target strategy **cannot be changed** after deck creation
+- All cards from that deck use the same targeting logic
+- Tiebreakers apply when multiple targets are equally valid
+- Player names display a colored pill badge showing target strategy
+
+---
+
+## Game Setup
+
+### Initial Conditions
+- Each player has exactly **20 cards** in their deck
+- Players may choose any combination and order of cards (duplicates allowed)
+- Each player starts with **200 Health Points (HP)**
+- Each player starts with **4 Mana** (gains 1 per turn, max 10)
+- The battlefield has **5 slots** per player
+- Card order in deck is predetermined and visible to both players
+
+---
+
+## Game Flow
+
+### Turn Structure
+The game follows this sequence each turn:
+
+```
+1. Mana Phase (gain mana)
+2. Draw Phase (with disadvantage calculation)
+3. Placement Phase (automatic)
+4. Attack Phase
+5. End Turn (activate cards)
+```
+
+**Note**: Both players act simultaneously each turn.
+
+---
+
+## Phase Details
+
+### Mana Phase
+**Rules:**
+- At the start of each turn, each player gains **+1 max mana** (up to 10)
+- Current mana is fully restored to max mana
+- Mana is spent when drawing cards (costs vary by card type)
+- Unused mana does not carry over between turns
+- First turn: Players start with 4 mana
+
+### Draw Phase
+**Rules:**
+- Players draw cards until:
+  - Field is full (5 cards) OR
+  - Deck is empty OR
+  - Cannot afford next card (insufficient mana)
+  
+- Each card drawn:
+  - Costs mana based on card type (1-5 mana)
+  - Has base stats from CARD_TYPES
+  - Receives the player's deck type bonus (if any)
+  - Is placed automatically on the field
+  
+- If field is empty (0 cards), newly drawn card becomes **active immediately**
+- If field has cards, newly drawn card is **inactive** (cannot attack this turn)
+
+### Equalization Phase
+After both players draw, if one player has fewer cards:
+- Behind player draws additional cards (free, no mana cost)
+- Draws until field counts are equal OR field is full OR deck is empty
+- These cards also receive the player's deck type bonus
+
+### Placement Phase
+**Automatic Process:**
+- Drawn cards automatically fill the leftmost empty slot
+- Players have no control over which slot is filled
+- Slot position has no gameplay effect
+- When cards die, remaining cards **slide left** to fill gaps
+
+### Attack Phase
+
+#### Attack Queue Construction
+1. Collect all **active cards** from both players
+2. Sort by **Speed** (descending - highest speed attacks first)
+3. For speed ties:
+   - Perform individual dice roll (1-6) for EACH tied pair
+   - Higher roll goes first in queue
+4. **Inactive cards do NOT enter the attack queue**
+
+#### Attack Execution
+Process each card in the queue sequentially:
+
+1. **Verify attacker is alive** (HP > 0)
+   - If dead, skip this attack
+
+2. **Find target (Strategy-Based Targeting):**
+   
+   The targeting behavior depends on the deck's target strategy:
+   
+   **🎯 Target Mana:**
+   - Always attacks the **highest mana cost** card
+   - Tiebreaker: Cards that haven't attacked yet
+   
+   **💀 Kill Shot:**
+   - **Priority 1**: If can kill any card, target the **strongest killable** (highest HP)
+   - **Priority 2**: If can't kill, target the **strongest card overall** (highest HP)
+   - Tiebreakers: 1) Highest mana cost, 2) Haven't attacked yet
+   
+   **⚡ Optimize Damage:**
+   - Targets the card that **minimizes wasted damage** (closest HP to attacker's attack)
+   - Tiebreakers: 1) Highest mana cost, 2) Haven't attacked yet
+   
+   **All strategies:**
+   - Inactive cards **cannot be targeted**
+   - If no active cards exist, attack enemy player directly
+
+3. **Deal damage:**
+   - Subtract attacker's Attack value from target's HP
+   - If target card reaches HP ≤ 0:
+     - Card is **immediately destroyed and removed**
+     - Remaining cards slide left
+     - Update available targets for subsequent attacks
+   - If attacking player directly:
+     - Subtract Attack value from player's HP
+
+4. **Continue to next card in queue**
+
+#### Important Attack Rules
+- Cards attack **once per turn only**
+- Attacks are **one-way** (no counter-attacks)
+- Dead cards are removed **immediately** (prevents overkill)
+- Cards cannot attack the turn they are played (unless field was empty)
+
+---
+
+## Card States
+
+### Active vs Inactive
+- **Active Card**: 
+  - Can attack during attack phase
+  - Can be targeted by enemy attacks
+  - Shown with green indicator
+  
+- **Inactive Card**:
+  - Just placed this turn
+  - CANNOT attack
+  - CANNOT be targeted (protected for one turn)
+  - Shown with gray indicator, visually offset
+
+### State Transitions
+- Cards placed → Start as **inactive**
+- End of turn → All inactive cards become **active**
+- Exception: Cards drawn to empty field are **immediately active**
+
+---
+
+## Win Conditions
+
+### Primary Win Condition
+**Player reaches 0 HP** → Opponent wins immediately
+
+### Deck Exhaustion
+When **both players** have:
+- 0 cards remaining in deck AND
+- 0 cards on the battlefield
+
+Then winner is determined by:
+1. **Higher HP** → That player wins
+2. **Equal HP** → Draw/Stalemate (treaty reached)
+
+### Impossibilities
+- Both players **cannot** reach 0 HP in same turn (one always dies first)
+- Field **cannot** be empty during attack phase (last attacker always survives)
+
+---
+
+## Field Management
+
+### Slot Rules
+- 5 slots per player (indexed 0-4, left to right)
+- Empty slots shown as dashed outlines
+- Cards automatically fill leftmost empty slot
+
+### Card Removal
+When a card is destroyed:
+1. Card moved to discard pile
+2. Slot becomes empty
+3. All remaining cards **immediately slide left**
+4. Rightmost slots become empty
+
+### Drawing Restrictions
+- Cannot draw if field is full (5 cards)
+- Cannot draw if deck is empty
+
+---
+
+## Deck Construction Rules
+
+### Valid Decks
+- Exactly **20 cards** required
+- Any combination of the 5 card types allowed
+- Duplicates allowed (e.g., 20 Goblins is legal)
+- Card order is fixed and predetermined
+- Each deck **must** specify a **deck type**: `'speedy'`, `'hardy'`, or `'angry'`
+- Each deck **must** specify a **target strategy**: `'target-mana'`, `'kill-shot'`, or `'optimize-damage'`
+- Both deck type and target strategy are immutable once set
+- Missing or invalid deck types/strategies will be rejected during game initialization
+- Examples:
+  - Balanced: Mix of all types with Hardy + Kill Shot
+  - Rush: All fast cards (Goblin/Skeleton) with Speedy + Optimize Damage
+  - Tank: All high-HP cards (Knight/Archer) with Hardy + Target Mana
+  - Glass Cannon: High attack cards (Wizard) with Angry + Kill Shot
+
+---
+
+## Game Mechanics & Strategy
+
+### Deterministic Elements
+- Card stats are fixed (base stats + deck type bonus)
+- Deck order is predetermined and visible
+- Smart AI targeting follows consistent rules
+
+### Random Elements
+- **Speed tie-breaking**: Dice rolls (1-6) determine attack order for equal speeds
+
+### Strategic Elements
+- Deck order is fixed and visible to both players
+- Mana management affects which cards can be drawn
+- Smart targeting AI makes optimal tactical decisions
+- Deck type bonuses allow for specialized strategies
+
+---
+
+## Strategy Considerations
+
+### Card Synergies
+- **Speed advantage**: Fast cards attack first, can destroy threats
+- **HP tanking**: High HP cards absorb damage, protect player
+- **Damage output**: High attack cards pressure enemy HP
+- **Inactive protection**: New cards get 1 turn of immunity
+- **Mana efficiency**: Low-cost cards allow more draws per turn
+- **Value trades**: High-cost cards are prioritized by smart targeting
+
+### Timing Factors
+- Active cards are vulnerable but threatening
+- Inactive cards are safe but passive
+- Empty field triggers immediate activation
+- Speed determines strike order
+- Mana increases each turn (starting at 4, max 10)
+- Starting with 4 mana means turn 1 is already mid-curve
+- Deck type bonuses apply consistently throughout the game
+
+### Deck Building Strategies
+- **Early Rush**: Stack cheap cards (Goblin/Skeleton) for early board control
+- **Late Game**: Stack expensive cards (Knight/Wizard) to dominate later turns
+- **Balanced Curve**: Mix of costs to maintain presence throughout the game
+- **Deck Type Synergies**:
+  - **Speedy** + fast cards (Goblin) = ultra-fast strikes
+  - **Hardy** + tanks (Knight) = nearly unkillable walls
+  - **Angry** + high attack (Wizard) = devastating damage
+
+---
+
+## Edge Cases & Clarifications
+
+1. **What if all active cards die before attacking?**
+   - Remaining attacks in queue are skipped for dead cards
+
+2. **What if a card survives with negative HP?**
+   - Impossible - cards at HP ≤ 0 are immediately removed
+
+3. **Can inactive cards be attacked?**
+   - No - only active cards can be targeted
+
+4. **What happens with simultaneous deaths?**
+   - Impossible - attacks are sequential, one at a time
+
+5. **Priority when field was empty?**
+   - Newly drawn card becomes active immediately and can attack
+
+6. **Does slot position matter?**
+   - No - only used for tie-breaking (leftmost wins)
+
+---
+
+## Summary of Key Rules
+
+✅ **DO**:
+- Define deck type as part of deck construction (Speedy, Hardy, or Angry - required)
+- Define target strategy as part of deck construction (Target Mana, Kill Shot, or Optimize Damage - required)
+- Gain +1 max mana each turn (max 10)
+- Spend mana to draw cards (costs vary by card type)
+- Use base stats from CARD_TYPES for all cards
+- Apply deck type bonus to all cards drawn
+- Use deck's target strategy for all attacks
+- Remove dead cards immediately
+- Activate all cards at end of turn
+- Equalize card counts after draw phase
+
+❌ **DON'T**:
+- Let inactive cards attack
+- Target inactive cards
+- Draw when field is full or out of mana
+- Forget to slide cards left after deaths
+- Allow negative HP to persist
+- Modify deck type after deck is created
+
+---
+
+## Visual Indicators
+
+- **Green dot**: Active card (can attack/be attacked)
+- **Gray dot**: Inactive card (protected)
+- **Gold border**: Next card to be drawn
+- **Strikethrough**: Card already drawn
+- **Offset position**: Inactive card visual cue
+- **Gold glow on stats**: Deck type bonus applied (Speed/Attack/HP)
+- **Colored pill badges**: Next to player names showing deck configuration
+  - **Deck Type Pills**: Yellow (Speedy), Blue (Hardy), Red (Angry)
+  - **Strategy Pills**: Purple (Target Mana), Red (Kill Shot), Green (Optimize)
+
+---
+
+## Game Balance
+
+The 5 card types offer different strategic focuses:
+
+| Card | Cost | Role | Strengths | Weaknesses |
+|------|------|------|-----------|------------|
+| **Goblin** | 1 | Early Rush | Cheapest, highest speed | Lowest stats overall |
+| **Skeleton** | 2 | Balanced Fighter | Good early-mid game | Nothing exceptional |
+| **Archer** | 4 | Mid-Game Core | Balanced stats, good speed | Jack of all trades |
+| **Wizard** | 6 | Glass Cannon | High attack & speed | Moderate HP |
+| **Knight** | 10 | Tank | Highest HP, strong attack | Very expensive, slow |
+
+### Mana Curve Considerations
+- **Turn 1** (4 mana): Can afford Archer, or multiple cheap cards (Goblin/Skeleton)
+- **Turn 2** (5 mana): Can afford multiple mid-cost cards
+- **Turn 3** (6 mana): Wizard becomes available
+- **Turn 7** (10 mana): Knight becomes available, or multiple cheaper cards
+- **Turn 10** (10 mana): Can draw 1 Knight, or 10 Goblins, or any combination
+
+### Targeting Strategies & Synergies
+Different targeting strategies create different playstyles:
+
+**🎯 Target Mana Strategy:**
+- Best for: Control decks that want to eliminate expensive threats
+- Synergy: Pairs well with Hardy (survive to outlast opponent's best cards)
+- Weakness: May overkill low HP expensive cards
+
+**💀 Kill Shot Strategy:**
+- Best for: Balanced decks that want efficient board control
+- Synergy: Pairs well with any deck type, especially Angry (kill more targets)
+- Weakness: May ignore expensive threats if they can't be killed
+
+**⚡ Optimize Damage Strategy:**
+- Best for: Aggressive decks that want to maximize total damage output
+- Synergy: Pairs well with Speedy (attack first, choose best targets)
+- Weakness: May leave high-value targets alive longer
+
+**Tiebreakers across all strategies:**
+- Expensive cards (Knight, Wizard) prioritized when primary criteria tied
+- Fresh cards (haven't attacked) targeted over exhausted ones as final tiebreaker
